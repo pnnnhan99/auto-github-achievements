@@ -41,8 +41,8 @@ jobs:
       # Step 2: Configure Git
       - name: Configure Git user
         run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "actions@github.com"
+          git config --global user.name "pnnnhan99"
+          git config --global user.email "nnhann99@gmail.com"
       
       # Step 3: Determine loop count
       - name: Set up loop count
