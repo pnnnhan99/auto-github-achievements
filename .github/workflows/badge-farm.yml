@@ -67,44 +67,48 @@ jobs:
           for i in $(seq 1 $LOOP_COUNT); do
             echo "=== Starting loop $i/$LOOP_COUNT ==="
             
+            # 0. ALWAYS SYNC LATEST CODE BEFORE WORKING TO PREVENT CONFLICTS
+            git checkout main
+            git pull origin main
+            
             # a. Create new branch with unique name
             BRANCH_NAME="badge-farm-${TIMESTAMP}-${i}"
             echo "Creating branch: $BRANCH_NAME"
             git checkout -b "$BRANCH_NAME"
             
-            # b. Add timestamp line to log file
+            # b. OVERWRITE log file (use > instead of >> to avoid conflicts)
             CURRENT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-            echo "Badge farm entry at $CURRENT_TIME - Loop $i" >> badge-farm-log.txt
+            echo "Badge farm entry at $CURRENT_TIME - Loop $i" > badge-farm-log.txt
             git add badge-farm-log.txt
             git commit -m "Badge farm: Add log entry for loop $i"
             git push origin "$BRANCH_NAME"
             
             # c. Create Pull Request
             echo "Creating Pull Request..."
-            gh pr create \
+            PR_URL=$(gh pr create \
               --title "Badge Farm PR #$i - Auto-generated" \
-              --body "Pull request automatically created to farm GitHub achievements (Pull Shark, YOLO, Quickdraw). Created at: $CURRENT_TIME" \
+              --body "Pull request automatically created to farm GitHub achievements. Created at: $CURRENT_TIME" \
               --base main \
-              --head "$BRANCH_NAME"
+              --head "$BRANCH_NAME")
+            echo "Created PR successfully: $PR_URL"
             
-            # d. Wait 5-10 seconds for GitHub to recognize
+            # d. Wait for GitHub to recognize
             echo "Waiting 7 seconds for GitHub to recognize..."
             sleep 7
             
             # e. Merge immediately (squash)
-            echo "Merge Pull Request (squash)..."
-            gh pr merge --squash --admin
+            echo "Automatically merging Pull Request..."
+            gh pr merge "$PR_URL" --squash
             
             # f. Clean up: Delete temporary branch
             echo "Deleting temporary branch..."
             git checkout main
-            git pull origin main
-            git branch -D "$BRANCH_NAME"
+            git branch -D "$BRANCH_NAME" || true
             git push origin --delete "$BRANCH_NAME" || true
             
-            # g. Wait 15-30 seconds between loops to avoid rate limit
+            # g. Wait between loops to avoid rate limit
             if [ $i -lt $LOOP_COUNT ]; then
-              WAIT_TIME=$((15 + RANDOM % 16))  # Random between 15-30 seconds
+              WAIT_TIME=$((15 + RANDOM % 16))
               echo "Waiting $WAIT_TIME seconds before next loop..."
               sleep $WAIT_TIME
             fi
