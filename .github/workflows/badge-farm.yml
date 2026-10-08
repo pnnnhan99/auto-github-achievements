@@ -1,0 +1,114 @@
+name: Badge Farm - GitHub Achievements
+
+# Triggers for workflow
+on:
+  # manual run
+  workflow_dispatch:
+    inputs:
+      loop_count:
+        description: 'Number of PRs to create (loop count)'
+        required: true
+        default: '1'
+        type: choice
+        options:
+          - '1'
+          - '5'
+          - '10'
+          - '20'
+          - '50'
+  
+  # auto run at 00:00 UTC
+  schedule:
+    - cron: '0 0 * * *'
+
+# Permissions needed
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  badge-farm:
+    name: Create and merge PR to farm achievements
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      # Step 2: Configure Git
+      - name: Configure Git user
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+      
+      # Step 3: Determine loop count
+      - name: Set up loop count
+        id: setup-loops
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            LOOP_COUNT="${{ github.event.inputs.loop_count }}"
+          else
+            LOOP_COUNT="1"  # Default run 1 loop when scheduled
+          fi
+          echo "loop_count=$LOOP_COUNT" >> $GITHUB_OUTPUT
+          echo "Will perform $LOOP_COUNT loops"
+      
+      # Step 4: Loop to create and merge PR
+      - name: Perform loop to create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LOOP_COUNT=${{ steps.setup-loops.outputs.loop_count }}
+          TIMESTAMP=$(date +%s)
+          
+          for i in $(seq 1 $LOOP_COUNT); do
+            echo "=== Starting loop $i/$LOOP_COUNT ==="
+            
+            # a. Create new branch with unique name
+            BRANCH_NAME="badge-farm-${TIMESTAMP}-${i}"
+            echo "Creating branch: $BRANCH_NAME"
+            git checkout -b "$BRANCH_NAME"
+            
+            # b. Add timestamp line to log file
+            CURRENT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+            echo "Badge farm entry at $CURRENT_TIME - Loop $i" >> badge-farm-log.txt
+            git add badge-farm-log.txt
+            git commit -m "Badge farm: Add log entry for loop $i"
+            git push origin "$BRANCH_NAME"
+            
+            # c. Create Pull Request
+            echo "Creating Pull Request..."
+            gh pr create \
+              --title "Badge Farm PR #$i - Auto-generated" \
+              --body "Pull request automatically created to farm GitHub achievements (Pull Shark, YOLO, Quickdraw). Created at: $CURRENT_TIME" \
+              --base main \
+              --head "$BRANCH_NAME"
+            
+            # d. Wait 5-10 seconds for GitHub to recognize
+            echo "Waiting 7 seconds for GitHub to recognize..."
+            sleep 7
+            
+            # e. Merge immediately (squash)
+            echo "Merge Pull Request (squash)..."
+            gh pr merge --squash --admin --yes
+            
+            # f. Clean up: Delete temporary branch
+            echo "Deleting temporary branch..."
+            git checkout main
+            git branch -D "$BRANCH_NAME"
+            git push origin --delete "$BRANCH_NAME" || true
+            
+            # g. Wait 15-30 seconds between loops to avoid rate limit
+            if [ $i -lt $LOOP_COUNT ]; then
+              WAIT_TIME=$((15 + RANDOM % 16))  # Random between 15-30 seconds
+              echo "Waiting $WAIT_TIME seconds before next loop..."
+              sleep $WAIT_TIME
+            fi
+            
+            echo "=== Completed loop $i ==="
+          done
+          
+          echo "=== All $LOOP_COUNT loops completed ==="
