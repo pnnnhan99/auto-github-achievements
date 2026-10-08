@@ -93,7 +93,7 @@ jobs:
             
             # e. Merge immediately (squash)
             echo "Merge Pull Request (squash)..."
-            gh pr merge --squash --admin --yes
+            gh pr merge --squash --admin
             
             # f. Clean up: Delete temporary branch
             echo "Deleting temporary branch..."
